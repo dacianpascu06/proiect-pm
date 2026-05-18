@@ -36,8 +36,14 @@ func handlePm(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(response))
 }
 
+func handleAlive(w http.ResponseWriter, r *http.Request) {
+	println("Received heartbeat")
+	w.WriteHeader(http.StatusOK)
+}
+
 func main() {
 	println("Starting server")
 	http.HandleFunc("/pm", handlePm)
+	http.HandleFunc("/alive", handleAlive)
 	http.ListenAndServe(":4000", nil)
 }

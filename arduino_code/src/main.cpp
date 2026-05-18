@@ -5,6 +5,8 @@
 #include <MFRC522.h>
 #include <SPI.h>
 #include <SoftwareSerial.h>
+#include <avr/interrupt.h>
+#include <avr/io.h>
 #include <util/delay.h>
 
 #define RST_PIN 9
@@ -16,6 +18,8 @@
 const char *ssid = "daci";
 const char *password = "12341234";
 const char *serverIp = "74.161.152.120";
+volatile uint8_t seconds_counter = 0;
+bool triggerHeartbeat = true;
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 SoftwareSerial esp8266(ESP_RX_PIN, ESP_TX_PIN);
@@ -85,6 +89,71 @@ bool connectToWifi() {
   return false;
 }
 
+bool sendHeartbeat() {
+  Serial.println("sending heartbeat");
+  // open tcp to nginx on vm that runs on 80
+  String cmd = "AT+CIPSTART=\"TCP\",\"";
+  cmd += serverIp;
+  cmd += "\",80\r\n";
+  String tcpResponse = sendCommand(cmd, 2000);
+
+  if (tcpResponse.indexOf("OK") == -1) {
+    Serial.println("vm is down");
+    return false;
+  }
+
+  // construct the request
+  String httpRequest = "GET /alive HTTP/1.1\r\n";
+  httpRequest += "Host: " + String(serverIp) + "\r\n";
+  httpRequest += "Connection: close\r\n\r\n";
+
+  // send length
+  cmd = "AT+CIPSEND=";
+  cmd += httpRequest.length();
+  cmd += "\r\n";
+  sendCommand(cmd, 1000);
+
+  String httpResponse = sendCommand(httpRequest, 3000);
+
+  sendCommand("AT+CIPCLOSE\r\n", 1000);
+
+  if (httpResponse.indexOf("502 Bad Gateway") != -1) {
+    Serial.println("backend app is down");
+    return false;
+  }
+
+  if (httpResponse.indexOf("200 OK") != -1) {
+    Serial.println("HEARTBEAT OK");
+    return true;
+  }
+
+  Serial.println("unknown error on heartbeat");
+  return false;
+}
+
+void timer1_init(void) {
+  cli();
+  TCNT1 = 0;
+
+  TCCR1A = 0;
+  TCCR1B = (1 << WGM12); // ctc
+
+  // 1 second
+  OCR1A = 15624;
+
+  TIMSK1 = (1 << OCIE1A);
+  TCCR1B |= (1 << CS12) | (1 << CS10); // prescaler 1024
+}
+
+ISR(TIMER1_COMPA_vect) {
+  seconds_counter++; // Add 1 second
+
+  if (seconds_counter >= 30) {
+    seconds_counter = 0;
+    triggerHeartbeat = true;
+  }
+}
+
 void setup() {
   // uart
   Serial.begin(9600);
@@ -97,6 +166,8 @@ void setup() {
   // init
   twi_init();
   lcd_init();
+  timer1_init();
+  sei();
   mfrc522.PCD_Init();
   delay(4);
 
@@ -121,17 +192,32 @@ void setup() {
     delay(30000);
   }
   lcd_set_cursor(0, 0);
-  lcd_print("                ");
+  lcd_print("Init  server    ");
   lcd_set_cursor(0, 1);
-  lcd_print("                ");
+  lcd_print("connection...    ");
   lcd_set_cursor(0, 0);
-
-  Serial.println(F("Ready to scan..."));
-  lcd_set_cursor(0, 0);
-  lcd_print("Ready to scan...");
 }
 
 void loop() {
+
+  if (triggerHeartbeat) {
+    bool retval = sendHeartbeat();
+    if (!retval) {
+      lcd_set_cursor(0, 0);
+      lcd_print("Server not      ");
+      lcd_set_cursor(0, 1);
+      lcd_print("responding...");
+      delay(10000);
+    } else {
+      triggerHeartbeat = false;
+      lcd_set_cursor(0, 0);
+      lcd_print("Ready to scan!  ");
+      lcd_set_cursor(0, 1);
+      lcd_print("                ");
+    }
+    return;
+  }
+
   if (!mfrc522.PICC_IsNewCardPresent()) {
     return;
   }
