@@ -1,8 +1,0 @@
-[
-    {
-        "command": "/home/rog/.platformio/packages/toolchain-atmelavr/bin/avr-g++ -o .pio/build/nanoatmega328/src/main.o -c -Wno-error=narrowing -fno-exceptions -fno-threadsafe-statics -fpermissive -std=gnu++11 -mmcu=atmega328p -Os -Wall -ffunction-sections -fdata-sections -flto -DF_CPU=16000000L -DPLATFORMIO=60119 -DARDUINO_AVR_NANO -Isrc src/main.cpp",
-        "directory": "/home/rog/Facultate/An3/teme/proiect-pm",
-        "file": "src/main.cpp",
-        "output": ".pio/build/nanoatmega328/src/main.o"
-    }
-]
