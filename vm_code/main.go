@@ -23,16 +23,17 @@ func handlePm(w http.ResponseWriter, r *http.Request) {
 	allowed, ok := database[uid]
 	fmt.Printf("Received id %s\n", uid)
 
+	response := fmt.Sprintf("verdict=%d", 0)
+
 	if !ok {
-		w.Write([]byte("0"))
+		w.Write([]byte(response))
 		println("unknown uid")
 		return
 	}
 	if allowed == 1 {
-		w.Write([]byte("1"))
-	} else {
-		w.Write([]byte("0"))
+		response = fmt.Sprintf("verdict=%d", 1)
 	}
+	w.Write([]byte(response))
 }
 
 func main() {

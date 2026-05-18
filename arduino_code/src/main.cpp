@@ -5,6 +5,7 @@
 #include <MFRC522.h>
 #include <SPI.h>
 #include <SoftwareSerial.h>
+#include <util/delay.h>
 
 #define RST_PIN 9
 #define SS_PIN 10
@@ -54,11 +55,34 @@ String sendUIDToServer(String uid) {
 
   String httpResponse = sendCommand(httpRequest, 3000);
 
+  int startIndex = httpResponse.indexOf("verdict") + 8;
+  String verdict = httpResponse.substring(startIndex, startIndex + 1);
+
   // close tcp conn
   sendCommand("AT+CIPCLOSE\r\n", 1000);
 
-  // return the response in order to handle if accepted or not
-  return httpResponse;
+  return verdict;
+}
+
+bool connectToWifi() {
+  // connect to wifi
+  String cmd = "AT+CWJAP=\"";
+  cmd += ssid;
+  cmd += "\",\"";
+  cmd += password;
+  cmd += "\"\r\n";
+
+  String wifiResponse = sendCommand(cmd, 5000);
+  Serial.println(wifiResponse.c_str());
+  if (wifiResponse.indexOf("DISCONNECT") != -1) {
+    return false;
+  }
+  if (wifiResponse.indexOf("CONNECT") != -1) {
+    return true;
+  }
+
+  Serial.println("connect to wifi unknown error");
+  return false;
 }
 
 void setup() {
@@ -78,23 +102,29 @@ void setup() {
 
   // show beginning lcd message
   lcd_set_cursor(0, 0);
-  lcd_print("System Ready.");
-  Serial.println(F("System Ready."));
+  lcd_print("Waiting for WIFI.");
+  Serial.println("Waiting for Wifi");
 
   // reset the esp
   sendCommand("AT+RST\r\n", 2000);
   // set to client mode
   sendCommand("AT+CWMODE=1\r\n", 1000);
 
-  // connect to wifi
-  String cmd = "AT+CWJAP=\"";
-  cmd += ssid;
-  cmd += "\",\"";
-  cmd += password;
-  cmd += "\"\r\n";
+  while (!connectToWifi()) {
+    // retry wifi
+    Serial.println(F("failed to connect to wifi"));
 
-  String wifiResponse = sendCommand(cmd, 5000);
-  Serial.println(wifiResponse.c_str());
+    lcd_set_cursor(0, 0);
+    lcd_print("WIFI FAILED     ");
+    lcd_set_cursor(0, 1);
+    lcd_print("Retrying!       ");
+    delay(30000);
+  }
+  lcd_set_cursor(0, 0);
+  lcd_print("                ");
+  lcd_set_cursor(0, 1);
+  lcd_print("                ");
+  lcd_set_cursor(0, 0);
 
   Serial.println(F("Ready to scan..."));
   lcd_set_cursor(0, 0);
@@ -129,14 +159,18 @@ void loop() {
   // send the uid
   String response = sendUIDToServer(uidString);
 
-  Serial.print(response.c_str());
+  Serial.print("verdict=" + response + "\n");
+
   // // reset screen
-  // lcd_set_cursor(0, 1);
-  // lcd_print("                ");
-  // lcd_set_cursor(0, 1);
+  lcd_set_cursor(0, 1);
+  lcd_print("                ");
+  lcd_set_cursor(0, 1);
 
-  // print response
-  // lcd_print(response.c_str());
+  if (response == "0") {
+    lcd_print("DENIED ENTRY!");
+  } else {
+    lcd_print("WELCOME!   ");
+  }
 
-  delay(2000);
+  delay(4000);
 }
