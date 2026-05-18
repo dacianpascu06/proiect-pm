@@ -59,6 +59,10 @@ String sendUIDToServer(String uid) {
 
   String httpResponse = sendCommand(httpRequest, 3000);
 
+  if (httpResponse.indexOf("verdict") == -1) {
+    return "error";
+  }
+
   int startIndex = httpResponse.indexOf("verdict") + 8;
   String verdict = httpResponse.substring(startIndex, startIndex + 1);
 
@@ -78,19 +82,47 @@ bool connectToWifi() {
 
   String wifiResponse = sendCommand(cmd, 5000);
   Serial.println(wifiResponse.c_str());
-  if (wifiResponse.indexOf("DISCONNECT") != -1) {
-    return false;
-  }
   if (wifiResponse.indexOf("CONNECT") != -1) {
     return true;
+  }
+
+  if (wifiResponse.indexOf("DISCONNECT") != -1) {
+    return false;
   }
 
   Serial.println("connect to wifi unknown error");
   return false;
 }
 
+bool isWifiConnected() {
+  String response = sendCommand("AT+CWJAP?\r\n", 1000);
+
+  if (response.indexOf("No AP") != -1 || response.indexOf("ERROR") != -1) {
+    return false;
+  }
+
+  return true;
+}
+
 bool sendHeartbeat() {
+
+  if (!isWifiConnected()) {
+    Serial.println(F("wifi went down"));
+    lcd_set_cursor(0, 0);
+    lcd_print("WIFI DOWN     ");
+    lcd_set_cursor(0, 1);
+    lcd_print("CONNECTING!       ");
+
+    while (!connectToWifi()) {
+      delay(10000);
+    }
+  }
   Serial.println("sending heartbeat");
+  lcd_set_cursor(0, 0);
+  lcd_print("Sending          ");
+  lcd_set_cursor(0, 1);
+  lcd_print("heartbeat ");
+
   // open tcp to nginx on vm that runs on 80
   String cmd = "AT+CIPSTART=\"TCP\",\"";
   cmd += serverIp;
@@ -191,11 +223,6 @@ void setup() {
     lcd_print("Retrying!       ");
     delay(30000);
   }
-  lcd_set_cursor(0, 0);
-  lcd_print("Init  server    ");
-  lcd_set_cursor(0, 1);
-  lcd_print("connection...    ");
-  lcd_set_cursor(0, 0);
 }
 
 void loop() {
@@ -226,6 +253,9 @@ void loop() {
     return;
   }
 
+  lcd_set_cursor(0, 0);
+  lcd_print("                ");
+
   lcd_set_cursor(0, 1);
   lcd_print("                ");
   lcd_set_cursor(0, 1);
@@ -254,9 +284,17 @@ void loop() {
 
   if (response == "0") {
     lcd_print("DENIED ENTRY!");
-  } else {
+  } else if (response == "1") {
     lcd_print("WELCOME!   ");
+  } else if (response == "error") {
+    triggerHeartbeat = true;
+    lcd_print("ERROR!     ");
+    return;
   }
-
-  delay(4000);
+  _delay_ms(2000);
+  lcd_set_cursor(0, 0);
+  lcd_print("Ready to scan!  ");
+  lcd_set_cursor(0, 1);
+  lcd_print("                ");
+  _delay_ms(200);
 }
