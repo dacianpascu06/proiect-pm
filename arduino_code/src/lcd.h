@@ -1,11 +1,12 @@
 #include <stdint.h>
 
 #define LCD_I2C_ADDR 0x27
-#define LCD_RS (1 << 0)
-#define LCD_RW (1 << 1)
-#define LCD_EN (1 << 2)
-#define LCD_BL (1 << 3)
-#define LCD_D4 (1 << 4)
+#define LCD_RS (1 << 0) // register select, command = 0, text = 1
+#define LCD_RW                                                                 \
+  (1 << 1) // read/write we keep it as write cuz we only write to the screen
+#define LCD_EN (1 << 2) // the lcd only reads data when this bit is set
+#define LCD_BL (1 << 3) // backlight
+#define LCD_D4 (1 << 4) // D4->D7 is where we put the nibble
 #define LCD_D5 (1 << 5)
 #define LCD_D6 (1 << 6)
 #define LCD_D7 (1 << 7)

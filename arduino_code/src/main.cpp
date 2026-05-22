@@ -19,7 +19,7 @@ const char *ssid = "daci";
 const char *password = "12341234";
 const char *serverIp = "74.161.152.120";
 volatile uint8_t seconds_counter = 0;
-bool triggerHeartbeat = true;
+volatile bool triggerHeartbeat = true;
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 SoftwareSerial esp8266(ESP_RX_PIN, ESP_TX_PIN);
@@ -180,7 +180,7 @@ void timer1_init(void) {
 ISR(TIMER1_COMPA_vect) {
   seconds_counter++; // Add 1 second
 
-  if (seconds_counter >= 30) {
+  if (seconds_counter >= 90) {
     seconds_counter = 0;
     triggerHeartbeat = true;
   }
@@ -246,10 +246,12 @@ void loop() {
   }
 
   if (!mfrc522.PICC_IsNewCardPresent()) {
+    // check if there is a card
     return;
   }
 
   if (!mfrc522.PICC_ReadCardSerial()) {
+    // read it
     return;
   }
 
@@ -263,11 +265,15 @@ void loop() {
   String uidString = "";
   for (byte i = 0; i < mfrc522.uid.size; i++) {
     char hexId[4];
+    // take two hex characters and transform them into two chars for the lcd to
+    // print
     sprintf(hexId, "%02X ", mfrc522.uid.uidByte[i]);
     lcd_print(hexId);
 
     // logic to build a clean string
+    // for single digits 0,1,2,3,a,b,c,d,e,f pad with a 0 before
     uidString += String(mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
+    // take the raw byte that is 2 hex characters and convert to two chars
     uidString += String(mfrc522.uid.uidByte[i], HEX);
   }
   Serial.println(uidString);
